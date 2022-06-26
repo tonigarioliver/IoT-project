@@ -1,82 +1,69 @@
-
 // From https://randomnerdtutorials.com/esp32-mqtt-publish-subscribe-arduino-ide
 
 #include <WiFi.h>
 #include "PubSubClient.h"
-                  /////////Global variables////////////////////////////
-///Wifi
-const char *SSID = "Wokwi-GUEST";
-const char *PWD = "";
-//// timmer
-unsigned long last_timeon = 0;
-unsigned long last_timeof = 0;
-/////MQTT
-// MQTT client
+#include "define.h"
+
+            ///////Global Variables///////////
+//////Wifi
+const char* SSID = "Wokwi-GUEST";
+const char* PWD = "";
+//////MQTT Broker
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient); 
-PubSubClient client(wifiClient);
-const char *mqttServer = "broker.hivemq.com";
+const char *mqttServer = "tom.uib.es";
 int mqttPort = 1883;
 const char topicpubled[] = "esp32statusled";
 const char topicsubled[] = "esp32actionled";
 char clientId[50];
+////////timmer
+unsigned long timeroffled = 0 ;
+unsigned long timeronled = 0 ;
 
 
-
-                  ////////////////// Methods////////////////////////
-////Wifi
+          ///////////Auxiliar Functions////////
+////WiFi
 void connectToWiFi() {
-  Serial.print(F("Connectiog to "));
+  Serial.print("Connectiog to ");
+ 
   WiFi.begin(SSID, PWD);
   Serial.println(SSID);
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.print(F("."));
+    Serial.print(".");
     delay(500);
   }
-  Serial.print(F("Connected"));
+  Serial.print(F("Connected."));
 }
-
-////////////MQTT_ Client
-void callback(char* topic, byte* message, unsigned int length) {
-  Serial.print("Message arrived on topic: ");
-  Serial.print(topic);
-  Serial.print(". Message: ");
-  String stMessage;
-  
+////////MQTT Broker
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print(F("Message:"));
   for (int i = 0; i < length; i++) {
-    Serial.print((char)message[i]);
-    stMessage += (char)message[i];
+    Serial.print((char)payload[i]);
   }
-  Serial.println();
 }
 
 void setupMQTT() {
-  client.setServer(mqttServer, mqttPort);
+  mqttClient.setServer(mqttServer, mqttPort);
   // set the callback function
-  client.setCallback(callback);
+  mqttClient.setCallback(callback);
 }
 
-
-void mqttReconnect() {
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    long r = random(1000);
-    sprintf(clientId, "clientId-%ld", r);
-    if (client.connect(clientId)) {
-      Serial.print(clientId);
-      Serial.println(" connected");
-      client.subscribe("esp32actionled");
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      delay(5000);
-    }
+void reconnect() {
+  Serial.println(F("Connecting to MQTT Broker..."));
+  while (!mqttClient.connected()) {
+      Serial.println(F("Reconnecting to MQTT Broker.."));
+      String clientId = "ESP32Client-";
+      clientId += String(random(0xffff), HEX);
+      
+      if (mqttClient.connect(clientId.c_str())) {
+        Serial.println(F("Connected."));
+        // subscribe to topic
+        mqttClient.subscribe(topicsubled);
+      } 
   }
 }
 
-
-              ///////////////SETUP////////
+        /////////////Setup////////
 void setup() {
   Serial.begin(9600);
   connectToWiFi();
@@ -84,28 +71,22 @@ void setup() {
 }
 
 
-        ///////////MAIN///////////777
+      ////////Main////
 void loop() {
-  if (!client.connected()){
-    mqttReconnect();
+  if(WiFi.status() != WL_CONNECTED){
+    connectToWiFi();
+    if(!mqttClient.connected()){
+      reconnect();
+    }
+  }else if(!mqttClient.connected()){
+      reconnect();
   }
-  client.loop();
-  if (millis() - last_timeon > 1000) {
-    last_timeon = millis();
-    // Send data
-    char data[] ="on";
-    // Publishing data throgh MQTT
-    Serial.println(data);
-    client.publish(topicpubled, data);
+  mqttClient.loop();
+  long now = millis();
+  if(millis() - timeronled>def_timeronled){
+    mqttClient.publish(topicpubled,"on");
   }
-
-  if (millis() - last_timeof > 2000) {
-    last_timeof = millis();
-    // Send data
-    char data[] ="off";
-    // Publishing data throgh MQTT
-    Serial.println(data);
-    client.publish(topicpubled, data);
+  if(millis() - timeroffled>def_timeroffled){
+     mqttClient.publish(topicpubled,"off");
   }
-
 }
