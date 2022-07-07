@@ -6,8 +6,8 @@
 
 struct Button {
   const uint8_t PIN;
-  uint32_t numberKeyPresses;
-  bool pressed;
+  volatile uint32_t numberKeyPresses;
+  volatile bool pressed;
 };
 
 Button button1 = {bt1, 0, false};
@@ -20,13 +20,13 @@ void isr_bt1() {
 }
 
 void isr_bt2() {
-  button1.numberKeyPresses += 1;
-  button1.pressed = true;
+  button2.numberKeyPresses += 1;
+  button2.pressed = true;
 }
 
-void isr_bt2() {
-  button1.numberKeyPresses += 1;
-  button1.pressed = true;
+void isr_bt3() {
+  button3.numberKeyPresses += 1;
+  button3.pressed = true;
 }
 
 void setup() {
