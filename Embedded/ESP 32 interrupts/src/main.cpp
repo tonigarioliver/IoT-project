@@ -2,15 +2,14 @@
 #define switched true                 // value if the button switch has been pressed
 #define triggered true                // controls interrupt handler
 #define interrupt_trigger_type RISING // interrupt triggered on a RISING input
-#define debounce 10                   // time to wait in milli secs
-
-#define LED1 7
-#define LED2 2
-#define LED3 3
-#define bt1 2
-#define bt2 4
-#define bt3 5
-bool led_status = LOW; // start with LED off, for testing of switch code only
+#define debounce 10
+                   // time to wait in milli secs
+#define LED1 13
+#define LED2 12
+#define bt1 27
+#define bt2 26
+bool led_status1= LOW; // start with LED off, for testing of switch code only
+bool led_status2 = LOW; // start with LED off, for testing of switch code only
 
 volatile bool interrupt_process_status = {
     !triggered // start with no switch press pending, ie false (!triggered)
@@ -25,22 +24,10 @@ struct Button
 
 Button button1 = {bt1, 0, false};
 Button button2 = {bt2, 0, false};
-Button button3 = {bt3, 0, false};
 
-void isr_bt1()
-{
-  button1.numberKeyPresses += 1;
+/////////////////////ISR FUNCTIONS
+void isr_bt1(){
   button1.pressed = true;
-}
-
-void isr_bt2()
-{
-  button2.pressed = true;
-}
-
-void isr_bt3()
-{
-  button3.pressed = true;
 }
 
 void isr_bt2()
@@ -94,48 +81,56 @@ bool read_button()
   }
   return !switched; // either no press request or debounce period not elapsed
 }
+////////////////////////////////Other function////////////////////////////////
+void pinSETUP(){
+  pinMode(button1.PIN, INPUT_PULLUP);
+  pinMode(button2.PIN, INPUT_PULLUP);
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  attachInterrupt(digitalPinToInterrupt(button1.PIN), isr_bt1, interrupt_trigger_type);
+  attachInterrupt(digitalPinToInterrupt(button2.PIN), isr_bt2, interrupt_trigger_type);
+  initialisation_complete = true; // open interrupt processing for business
+}
 
+///////////////////////////////////////////////////////
 void setup()
 {
   Serial.begin(115200);
-  pinMode(button1.PIN, INPUT_PULLUP);
-  pinMode(button2.PIN, INPUT_PULLUP);
-  pinMode(button3.PIN, INPUT_PULLUP);
-  pinMode(LED1, OUTPUT);
-  pinMode(LED2, OUTPUT);
-  pinMode(LED3, OUTPUT);
-  attachInterrupt(digitalPinToInterrupt(button1.PIN), isr_bt1, interrupt_trigger_type);
-  attachInterrupt(digitalPinToInterrupt(button2.PIN), isr_bt2, interrupt_trigger_type);
-  attachInterrupt(digitalPinToInterrupt(button3.PIN), isr_bt3, interrupt_trigger_type);
-  initialisation_complete = true; // open interrupt processing for business
+  void pinSETUP();
 }
 
 void loop()
 {
+  ////////////BUTTON 1
   if (button1.pressed)
   {
-    Serial.printf("Button 1 has been pressed %u times\n", button1.numberKeyPresses);
-    button1.pressed = false;
+    uint8_t read = LOW;
+    static long elapse_timer;
+    static uint8_t lastState;
+    if(digitalRead(button1.PIN) == HIGH){
+       read = HIGH;
+    }
+    if(millis() - elapse_timer >=debounce){
+        if(lastState != read && lastState ==LOW){
+          Serial.println("Changed digital");
+          led_status1 = HIGH - led_status1; // toggle state
+          digitalWrite(LED1, led_status1);
+        }
+        elapse_timer = millis();
+        lastState = read;
+    }
+    button1.pressed =false;
   }
-  // test buton switch and process if pressed
+
+  // BUTTON 2
   if (read_button() == switched)
   {
     // button on/off cycle now complete, so flip LED between HIGH and LOW
-    led_status = HIGH - led_status; // toggle state
-    digitalWrite(LED2, led_status);
+    led_status2 = HIGH - led_status2; // toggle state
+    digitalWrite(LED2, led_status2);
   }
   else
   {
     // do other things....
   }
-  if (button3.pressed)
-  {
-    /* if(digitalRead(button3.PIN) == HIGH){
-       start_timehigh = millis();
-     }if else(millis()-start_timehigh>debounce){
-       pressing
-     }
-     if(digitalRead(button3.PIN) == LOW)
-     button3.pressed = false;
-   }*/
-  }
+}
